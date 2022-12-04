@@ -15,11 +15,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <stdlib.h>
 #include <stdio.h>
-
-enum {
-	physical, logical, comment, end
-};
 
 struct counter {
 	unsigned long physical;
@@ -47,11 +44,8 @@ struct flag {
 	char lastchar;
 };
 
-int parsechar(const char c, struct counter *counter, struct flag *flag) {
-	if (c == EOF) {
-		return 0;
-	}
-	else if (flag->escapechar) {
+char parsechar(const char c, struct counter *counter, struct flag *flag) {
+	if (flag->escapechar) {
 		flag->escapechar = 0;
 	}
 	else if (c == '\\') {
@@ -122,7 +116,7 @@ int parsechar(const char c, struct counter *counter, struct flag *flag) {
 		break;
 	case ';':
 		flag->physical = 1;
-		if (!flag->curly)
+		if (!flag->curly && !flag->paren)
 			flag->logical++;
 		flag->curly = 0;
 		flag->colon = 0;
@@ -145,31 +139,39 @@ int parsechar(const char c, struct counter *counter, struct flag *flag) {
 		break;
 	case '}':
 		flag->curly = 1;
-		/* fallthrough */
+		flag->physical = 1;
+		break;
 	default:
 		flag->physical = 1;
 		break;
 	}
-
-	printf("%c", c);
 	flag->lastchar = c;
-	return 1;
+	return c;
 }
 
 int sloc(FILE *file, struct counter *counter) {
 	if (!file)
-		return 1;
+		exit(2);
 	struct flag flag = { 0 };
-	while (parsechar(fgetc(file), counter, &flag));
+	counter->physical = 0;
+	counter->logical = 0;
+	counter->comment = 0;
+	while (parsechar(fgetc(file), counter, &flag) != EOF);
 	return 0;
 }
 
 int main(int argc, char **argv) {
+	int ret;
+	if (argc < 2)
+		exit(1);
 	FILE *file = fopen(argv[1], "r");
-	struct counter counter = { 0 };
-	sloc(file, &counter);
-	printf("physical: %lu\n", counter.physical);
-	printf("logical: %lu\n", counter.logical);
-	printf("comment: %lu\n", counter.comment);
-	return 0;
+	struct counter counter;
+	ret = sloc(file, &counter);
+	if (!ret) {
+		printf("physical: %lu\n", counter.physical);
+		printf("logical: %lu\n", counter.logical);
+		printf("comment: %lu\n", counter.comment);
+	}
+	fclose(file);
+	return ret;
 }
