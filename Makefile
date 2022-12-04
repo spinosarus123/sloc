@@ -30,7 +30,7 @@ uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/sloc
 
 clean:
-	rm -rf $(LOCAL_OBJDIR) $(LOCAL_DEPDIR)
+	rm -rf *.o
 
 options:
 	@echo "CC      = $(CC)"
