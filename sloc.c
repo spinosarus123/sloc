@@ -40,6 +40,7 @@ struct flag {
 	
 	int paren;
 	int curly;
+	int colon;
 
 	int escapechar;
 
@@ -47,8 +48,14 @@ struct flag {
 };
 
 int parsechar(const char c, struct counter *counter, struct flag *flag) {
-	if (flag->escapechar) {
+	if (c == EOF) {
+		return 0;
+	}
+	else if (flag->escapechar) {
 		flag->escapechar = 0;
+	}
+	else if (c == '\\') {
+		flag->escapechar = 1;
 	}
 	else if (flag->mlc) {
 		if (c == '\n')
@@ -73,27 +80,23 @@ int parsechar(const char c, struct counter *counter, struct flag *flag) {
 			flag->chr = 0;
 	}
 	else switch (c) {
-	case EOF:
-		return 0;
 	case '\n':
 		if (flag->physical)
 			counter->physical += 1;
 
-		if (flag->pre) {
-			counter->logical++;
-		}
-		else {
-			counter->logical += flag->logical;
-		}
+		if (flag->pre)
+			counter->logical = 1;
+		else if (flag->colon)
+			counter->logical += 1;
+
+		counter->logical += flag->logical;
 
 		flag->pre = 0;
 		flag->curly = 0;
+		flag->colon = 0;
 
 		flag->physical = 0;
 		flag->logical = 0;
-		break;
-	case '\\':
-		flag->escapechar = 1;
 		break;
 	case '#':
 		flag->pre = 1;
@@ -106,25 +109,27 @@ int parsechar(const char c, struct counter *counter, struct flag *flag) {
 		if (flag->lastchar == '/')
 			flag->slc = 1;
 		break;
+	case '\"':
+		flag->str = 1;
+		flag->physical = 1;
+		break;
 	case '\'':
 		flag->chr = 1;
+		flag->physical = 1;
 		break;
 	case ' ':
 	case '\t':
-		break;
-	case '"':
-		flag->physical = 1;
-		flag->str = 1;
 		break;
 	case ';':
 		flag->physical = 1;
 		if (!flag->curly)
 			flag->logical++;
+		flag->curly = 0;
+		flag->colon = 0;
 		break;
 	case ':':
 		flag->physical = 1;
-		if (!flag->logical)
-			flag->logical = 1;
+		flag->colon = 1;
 		break;
 	case '(':
 		flag->physical = 1;
